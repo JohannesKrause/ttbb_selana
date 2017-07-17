@@ -16,10 +16,10 @@ namespace SELAN{
   protected:
 
   private:
+    int m_check_dec;
     std::string m_inpath;
     std::string m_infile;
     std::string m_outpath;
-
   public:
 
 
@@ -42,6 +42,20 @@ namespace SELAN{
 
     bool Init()
     {
+      ATOOLS::Data_Reader reader(" ",";","//","=");
+      reader.AddWordSeparator("\t");
+      reader.SetAddCommandLine(false);
+      reader.SetInputPath(m_inpath);
+      std::string infile(m_infile);
+      if (m_infile.find('|')!=std::string::npos)
+        infile=infile.substr(0,infile.find('|'));
+      reader.SetInputFile(infile+"|BEGIN_SELANA|END_SELANA");
+      reader.SetComment("#");
+      m_check_dec = reader.GetValue<int>("CHECK_DEC", 1);
+      msg_Debugging()<<METHOD<<"(): { mode \n" <<
+                       "skip b's from hard decay handler:  " << m_check_dec <<
+                       ") \n }" << std::endl;
+
       return true;
     }
 
@@ -56,11 +70,12 @@ namespace SELAN{
           if (abs(particle->Flav().Kfcode())==5) return false;
         }
 
-      // veto b-emissions from the Shower which do not originate from the Hard Decay Handler
+      // veto b-emissions from the Shower which do not originate from the Hard Decay Handler if required
       ATOOLS::Blob *sh(bl->FindFirst(ATOOLS::btp::Shower));
-      ATOOLS::Particle_Vector outvec(sh->GetOutParticles());
+      outvec=sh->GetOutParticles();
       for (size_t i(0); i<outvec.size();i++){
           ATOOLS::Particle * particle(outvec.at(i));
+          if ( (abs(particle->Flav().Kfcode())==5) && !m_check_dec ) return false;
           if ( (abs(particle->Flav().Kfcode())==5) && !particle->Dec() ) return false;
         }
 

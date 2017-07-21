@@ -62,6 +62,7 @@ namespace SELAN{
 
     bool Run(ATOOLS::Blob_List *const bl){
 
+      if (m_modus==0) return true;
 
       // veto b-emissions from ME
       ATOOLS::Blob *sp(bl->FindFirst(ATOOLS::btp::Signal_Process));
@@ -77,36 +78,34 @@ namespace SELAN{
       // veto b-emissions from the Shower which do not originate from the Hard Decay Handler if required
       ATOOLS::Blob *sh(bl->FindFirst(ATOOLS::btp::Shower));
       outvec=sh->GetOutParticles();
-      size_t numb_ps(0);
+      size_t numb_ps(0), numb_ps_all(0);
       for (size_t i(0); i<outvec.size();i++){
           ATOOLS::Particle * particle(outvec.at(i));
           //  if ( (abs(particle->Flav().Kfcode())==5) && !m_check_dec ) return false;
           if ( (abs(particle->Flav().Kfcode())==5) && !particle->Dec() ){
               numb_ps++;
             }
+          if ( abs(particle->Flav().Kfcode())==5 ){
+              numb_ps_all++;
+            }
         }
-      /*
-      if (numb_me>=1){
-          size_t numb_tot(0);
-          for (ATOOLS::Blob_List::iterator blit=bl->begin();
+/*      for (ATOOLS::Blob_List::iterator blit=bl->begin();
                blit!=bl->end();++blit) {
               ATOOLS::Blob* blob=*blit;
               for (int i=0;i<blob->NOutP();i++) {
                   ATOOLS::Particle *particle=blob->OutParticle(i);
                   if (particle->DecayBlob()!=NULL) continue;
-                  if (abs(particle->Flav().Kfcode())==5) numb_tot++;
+                  if (abs(particle->Dec()) ) msg_Info() << "from Decay found!" << std::endl;
                 }
             }
-
-          msg_Info() << "numb from ME=" << numb_me <<  " number of b from ps: " << numb_ps <<  ", total b:" << numb_tot << "       " << std::endl;
-        }
-       */
-
+*/
       /*
-         modi:  1: default, veto all b emissions eiter from ME or PS
+         modi:  0: no Veto, all events pass
+                1: default, veto all b emissions eiter from ME or PS but not from HDH
                 2: veto only ME-em with > 2 b's in ME
                 3: veto all b ME-em
                 4: veto Shower and ME, but not the "1 b from ME" case
+                5: veto all all b emissions eiter from ME or PS, also from HDH
 
       */
 
@@ -116,6 +115,9 @@ namespace SELAN{
       if(m_modus==4){
           if(numb_me==1) return true;
           if (numb_me>0 || numb_ps>0) return false;
+      }
+      if(m_modus==5){
+          if (numb_me>0 || numb_ps_all>0) return false;
       }
 
       return true;

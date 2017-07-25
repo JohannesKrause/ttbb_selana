@@ -51,7 +51,6 @@ namespace SELAN{
         infile=infile.substr(0,infile.find('|'));
       reader.SetInputFile(infile+"|BEGIN_SELANA|END_SELANA");
       reader.SetComment("#");
-      m_check_dec = reader.GetValue<int>("CHECK_DEC", 1);
       m_modus = reader.GetValue<int>("SELMODUS", 1);
       msg_Debugging()<<METHOD<<"(): { mode \n" <<
                        "skip b's from hard decay handler:  " << m_check_dec <<
@@ -75,30 +74,42 @@ namespace SELAN{
             }
 
         }
-      // veto b-emissions from the Shower which do not originate from the Hard Decay Handler if required
+      // count number of outgoing b-quarks from the shower which do not go into the hard interaction
       ATOOLS::Blob *sh(bl->FindFirst(ATOOLS::btp::Shower));
       outvec=sh->GetOutParticles();
       size_t numb_ps(0), numb_ps_all(0);
       for (size_t i(0); i<outvec.size();i++){
           ATOOLS::Particle * particle(outvec.at(i));
-          //  if ( (abs(particle->Flav().Kfcode())==5) && !m_check_dec ) return false;
-          if ( (abs(particle->Flav().Kfcode())==5) && !particle->Dec() ){
+          if ( (abs(particle->Flav().Kfcode())==5) && !particle->Dec() && particle->Info()!='G'){
               numb_ps++;
             }
-          if ( abs(particle->Flav().Kfcode())==5 ){
+          if ( abs(particle->Flav().Kfcode())==5 && particle->Info()!='G'){
               numb_ps_all++;
             }
         }
-/*      for (ATOOLS::Blob_List::iterator blit=bl->begin();
+      int final_bs(0);
+     // msg_Info() << "start" << std::endl;
+      for (ATOOLS::Blob_List::iterator blit=bl->begin();
                blit!=bl->end();++blit) {
               ATOOLS::Blob* blob=*blit;
               for (int i=0;i<blob->NOutP();i++) {
                   ATOOLS::Particle *particle=blob->OutParticle(i);
                   if (particle->DecayBlob()!=NULL) continue;
-                  if (abs(particle->Dec()) ) msg_Info() << "from Decay found!" << std::endl;
+                  if (abs(particle->Flav().Kfcode())==5){
+         //             msg_Info() << particle->ProductionBlob()->TypeSpec();
+          //         std::string test("none");
+           //       if (particle->ProductionBlob()->TypeSpec()==test) {
+            //        msg_Debugging();
+             //       }
+                      final_bs++;
+                    }
                 }
             }
-*/
+      if (final_bs%2!=0){
+
+          msg_Info() << "end. final bs: " << final_bs << std::endl;
+      }
+
       /*
          modi:  0: no Veto, all events pass
                 1: default, veto all b emissions eiter from ME or PS but not from HDH
@@ -109,7 +120,9 @@ namespace SELAN{
 
       */
 
-      if(m_modus==1 && ((numb_ps>0) || (numb_me>0))) return false;
+      /* as before, but keep (almost all) events which have only unresolved b splittings.
+         b-quarks from the Shower list which go into the hard interaction are skipped. */
+      if(m_modus==1 && ((numb_ps+numb_me)>=2)) return false;
       if(m_modus==2 && numb_me>1) return false;
       if(m_modus==3 && numb_me>0) return false;
       if(m_modus==4){

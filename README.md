@@ -1,12 +1,12 @@
 # ttbb_selana
-This file implements an experimental filter which removes overlap between tt+jets / ttbb from tt+jets events. 
+The file *SELANA.C*  implements an experimental filter which removes overlap between tt+jets / ttbb from tt+jets events. 
 The file has to be placed in the same directory as the run card.
 
 compile instructions
 
 1. set variable *SHERPA_PREFIX* to your installation path, e.g. 
     
-            SHERPA_PREFIX=/home/s0118321/software/Sherpa/rel-2-2-2
+            SHERPA_PREFIX=/home/name/software/Sherpa/rel-2-2-2
             
 2. compile with 
     

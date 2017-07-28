@@ -87,28 +87,6 @@ namespace SELAN{
               numb_ps_all++;
             }
         }
-      int final_bs(0);
-     // msg_Info() << "start" << std::endl;
-      for (ATOOLS::Blob_List::iterator blit=bl->begin();
-               blit!=bl->end();++blit) {
-              ATOOLS::Blob* blob=*blit;
-              for (int i=0;i<blob->NOutP();i++) {
-                  ATOOLS::Particle *particle=blob->OutParticle(i);
-                  if (particle->DecayBlob()!=NULL) continue;
-                  if (abs(particle->Flav().Kfcode())==5){
-         //             msg_Info() << particle->ProductionBlob()->TypeSpec();
-          //         std::string test("none");
-           //       if (particle->ProductionBlob()->TypeSpec()==test) {
-            //        msg_Debugging();
-             //       }
-                      final_bs++;
-                    }
-                }
-            }
-      if (final_bs%2!=0){
-
-          msg_Info() << "end. final bs: " << final_bs << std::endl;
-      }
 
       /*
          modi:  0: no Veto, all events pass
@@ -120,9 +98,7 @@ namespace SELAN{
 
       */
 
-      /* as before, but keep (almost all) events which have only unresolved b splittings.
-         b-quarks from the Shower list which go into the hard interaction are skipped. */
-      if(m_modus==1 && ((numb_ps+numb_me)>=2)) return false;
+      if(m_modus==1 && ((numb_ps+numb_me)>0)) return false;
       if(m_modus==2 && numb_me>1) return false;
       if(m_modus==3 && numb_me>0) return false;
       if(m_modus==4){

@@ -78,9 +78,11 @@ namespace SELAN{
       ATOOLS::Blob *sh(bl->FindFirst(ATOOLS::btp::Shower));
       outvec=sh->GetOutParticles();
       size_t numb_ps(0), numb_ps_all(0);
+      //size_t num_dec(0);
       for (size_t i(0); i<outvec.size();i++){
           ATOOLS::Particle * particle(outvec.at(i));
-          if ( (abs(particle->Flav().Kfcode())==5) && !particle->Dec() && particle->Info()!='G'){
+          //if(particle->FromDec()) num_dec++;
+          if ( (abs(particle->Flav().Kfcode())==5) && !particle->FromDec() && particle->Info()!='G'){
               numb_ps++;
             }
           if ( abs(particle->Flav().Kfcode())==5 && particle->Info()!='G'){
@@ -97,6 +99,7 @@ namespace SELAN{
                 5: veto all all b emissions eiter from ME or PS, also from HDH
 
       */
+     // msg_Info() << "Particles from DEC: " << num_dec << "    " << std::endl; //check
 
       if(m_modus==1 && ((numb_ps+numb_me)>0)) return false;
       if(m_modus==2 && numb_me>1) return false;

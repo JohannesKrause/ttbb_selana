@@ -4,7 +4,7 @@
 #include <algorithm>
 
 /*compile with:
-  SHERPA_PREFIX=/home/s0118321/software/Sherpa/rel-2-2-2
+  SHERPA_PREFIX=/home/s0118321/software/Sherpa/rel-2-2-4
   g++ -shared -g -I`$SHERPA_PREFIX/bin/Sherpa-config --incdir`  `$SHERPA_PREFIX/bin/Sherpa-config --ldflags`  -fPIC -o libSELANA.so SELANA.C
  */
 
@@ -16,7 +16,7 @@ namespace SELAN{
   protected:
 
   private:
-    size_t m_check_dec, m_modus;
+    size_t m_modus;
     std::string m_inpath;
     std::string m_infile;
     std::string m_outpath;
@@ -53,7 +53,7 @@ namespace SELAN{
       reader.SetComment("#");
       m_modus = reader.GetValue<int>("SELMODUS", 1);
       msg_Debugging()<<METHOD<<"(): { mode \n" <<
-                       "skip b's from hard decay handler:  " << m_check_dec <<
+                       "skip b's from hard decay handler:  modus" << m_modus <<
                        ") \n }" << std::endl;
 
       return true;
@@ -63,7 +63,7 @@ namespace SELAN{
 
       if (m_modus==0) return true;
 
-      // veto b-emissions from ME
+      // go into signal process blob and look for b-quarks
       ATOOLS::Blob *sp(bl->FindFirst(ATOOLS::btp::Signal_Process));
       ATOOLS::Particle_Vector outvec(sp->GetOutParticles());
       size_t numb_me(0);

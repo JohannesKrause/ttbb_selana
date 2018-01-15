@@ -67,15 +67,17 @@ namespace SELAN{
       ATOOLS::Blob *sp(bl->FindFirst(ATOOLS::btp::Signal_Process));
       ATOOLS::Particle_Vector outvec(sp->GetOutParticles());
       size_t numb_me(0);
-      size_t num_light_fs_particles_me(0);
+      size_t num_light_fs_quarks_me(0);
+      size_t num_fs_gluons_me(0);
+
       for (size_t i=0; i<outvec.size(); i++){
           ATOOLS::Particle * particle(outvec.at(i));
           if (abs(particle->Flav().Kfcode())==5) {
               numb_me++;
             }
-          if ((abs(particle->Flav().Kfcode())<5) || particle->Flav().IsGluon()  ) {
-              num_light_fs_particles_me++;
-            }
+          if (abs(particle->Flav().Kfcode())<5) num_light_fs_quarks_me++;
+          if (particle->Flav().IsGluon()) num_fs_gluons_me++;
+
         }
       // count number of outgoing b-quarks from the shower which do not go into the hard interaction
       ATOOLS::Blob *sh(bl->FindFirst(ATOOLS::btp::Shower));
@@ -102,6 +104,8 @@ namespace SELAN{
                 5: veto all all b emissions eiter from ME or PS, also from HDH
                 6: veto all b emissions eiter from ME or PS but not from HDH,
                         exception: keep it, if >= 2 light jets in ME. (ttbb MC@NLO can only produce 1 extra light jet)
+                7: veto all b emissions eiter from ME or PS but not from HDH,
+                        exception: > 2 light jets from ME or >= 2 light quarks from ME
 
       */
      // msg_Info() << "Particles from DEC: " << num_dec << "    " << std::endl; //check
@@ -117,9 +121,15 @@ namespace SELAN{
           if (numb_me>0 || numb_ps_all>0) return false;
       }
       if(m_modus==6){
-          if (num_light_fs_particles_me >=2) return true;
+          if (num_light_fs_quarks_me + num_fs_gluons_me >= 2) return true;
           if ((numb_ps+numb_me)>0) return false;
 
+        }
+
+      if(m_modus==7){
+          if (num_light_fs_quarks_me + num_fs_gluons_me > 2) return true;
+          if (num_light_fs_quarks_me >=2 ) return true;
+          if ((numb_ps+numb_me)>0) return false;
         }
 
       return true;

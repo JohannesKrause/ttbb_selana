@@ -17,6 +17,7 @@ namespace SELAN{
 
   private:
     size_t m_modus;
+    bool m_nlo;
     std::string m_inpath;
     std::string m_infile;
     std::string m_outpath;
@@ -52,9 +53,10 @@ namespace SELAN{
       reader.SetInputFile(infile+"|BEGIN_SELANA|END_SELANA");
       reader.SetComment("#");
       m_modus = reader.GetValue<int>("SELMODUS", 1);
+      m_nlo = reader.GetValue<int>("NLO_Mode", 1);
       msg_Debugging()<<METHOD<<"(): { mode \n" <<
-                       "skip b's from hard decay handler:  modus" << m_modus <<
-                       ") \n }" << std::endl;
+                       "skip b's from hard decay handler:  modus(" << m_modus <<
+                       "), NLO(" << m_nlo << ") \n }" << std::endl;
 
       return true;
     }
@@ -104,7 +106,7 @@ namespace SELAN{
                 5: veto all all b emissions eiter from ME or PS, also from HDH
                 6: veto all b emissions eiter from ME or PS but not from HDH,
                         exception: keep it, if >= 2 light jets in ME. (ttbb MC@NLO can only produce 1 extra light jet)
-                7: veto all b emissions eiter from ME or PS but not from HDH,
+                7: veto all b emissions eiter from ME and all from PS but not from HDH,
                         exception: > 2 light jets from ME or >= 2 light quarks from ME
 
       */
@@ -127,10 +129,21 @@ namespace SELAN{
         }
 
       if(m_modus==7){
-          if (num_light_fs_quarks_me + num_fs_gluons_me > 2) return true;
-          if (num_light_fs_quarks_me >=2 ) return true;
-          if ((numb_ps+numb_me)>0) return false;
-        }
+          /* still some ambiguities: There could be configurations in the ttjets event with a ME including two light jets and one b-quark.
+           * If both light quarks are harder than the b-Quarks, this configuration should be kept in principle.
+           * May one can check this in the cluster configuration?
+           * One could for example directlx check the final cluster configuration and veto all configurations which have a ttbb cluster step?
+           */
+          if (numb_me>0) return false;
+          if (m_nlo){
+            if (num_light_fs_quarks_me + num_fs_gluons_me > 2) return true;
+            if (num_light_fs_quarks_me >=2 ) return true;
+          } else {
+            if (num_light_fs_quarks_me + num_fs_gluons_me > 1) return true;
+            if (num_light_fs_quarks_me >=1 ) return true;
+          }
+          if (numb_ps>0) return false;
+      }
 
       return true;
     }

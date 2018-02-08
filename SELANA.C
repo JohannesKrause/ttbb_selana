@@ -230,7 +230,7 @@ namespace SELAN{
            }
 
          if (pos==0) return true;
-         else return CheckPrev(ampl);
+         else return CheckPrev(ampl->Prev());
 
 
 

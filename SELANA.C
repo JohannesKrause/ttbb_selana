@@ -20,6 +20,8 @@ namespace SELAN{
   private:
     size_t m_modus;
     bool m_nlo;
+    bool m_store;
+    ATOOLS::Blob_List * p_bl;
     std::string m_inpath;
     std::string m_infile;
     std::string m_outpath;
@@ -56,6 +58,7 @@ namespace SELAN{
       reader.SetComment("#");
       m_modus = reader.GetValue<int>("SELMODUS", 1);
       m_nlo = reader.GetValue<int>("NLO_Mode", 1);
+      m_store = reader.GetValue<int>("STORE_IN_HEPMC", 0);
       msg_Debugging()<<METHOD<<"(): { mode \n" <<
                        "skip b's from hard decay handler:  modus(" << m_modus <<
                        "), NLO(" << m_nlo << ") \n }" << std::endl;
@@ -63,39 +66,11 @@ namespace SELAN{
       return true;
     }
 
-    bool CheckPrev(ATOOLS::Cluster_Amplitude *ampl){
-      //return only true, if a sufficient high number of light partons is present in this amplitude's final state
-      if (ampl==NULL) return false;
-      size_t num_q(0);
-      size_t num_g(0);
-      for (int i=2; i<ampl->Legs().size(); i++){
-          ATOOLS::Cluster_Leg *leg = ampl->Legs().at(i);
-          if (leg->Flav().IsGluon() && !leg->FromDec()) num_g++;
-          if (abs(leg->Flav().Kfcode())<5 && !leg->FromDec()) num_q++;
-      }
-
-      if (m_nlo){
-          if (num_q >=2 || (num_q + num_g)>2) return true;
-          else return false;
-        }
-      else{
-          if ((num_q + num_g)>=1) return true;
-          else return false;
-        }
-    }
-
-    size_t FindB(ATOOLS::Cluster_Amplitude *ampl){
-      if (ampl==NULL) return 0;
-      for (int i=2; i<ampl->Legs().size(); i++){
-          ATOOLS::Cluster_Leg *leg = ampl->Legs().at(i);
-          if ( abs(leg->Flav().Kfcode())==5 && !leg->FromDec()) return i;
-        }
-      return 0;
-    }
 
     bool Run(ATOOLS::Blob_List *const bl){
+      p_bl = bl;
 
-      if (m_modus==0) return true;
+      if (m_modus==0) return ReturnFunc(true);
 
       if (m_modus!=8){
           // go into signaif (NoB(ampl)) return true;l process blob and look for b-quarks
@@ -158,19 +133,19 @@ namespace SELAN{
       */
           // msg_Info() << "Particles from DEC: " << num_dec << "    " << std::endl; //check
 
-          if(m_modus==1 && ((numb_ps+numb_me)>0)) return false;
-          if(m_modus==2 && numb_me>1) return false;
-          if(m_modus==3 && numb_me>0) return false;
+          if(m_modus==1 && ((numb_ps+numb_me)>0)) return ReturnFunc(false);
+          if(m_modus==2 && numb_me>1) return ReturnFunc(false);
+          if(m_modus==3 && numb_me>0) return ReturnFunc(false);
           if(m_modus==4){
-              if(numb_me==1) return true;
-              if (numb_me>0 || numb_ps>0) return false;
+              if(numb_me==1) return ReturnFunc(true);
+              if (numb_me>0 || numb_ps>0) return ReturnFunc(false);
             }
           if(m_modus==5){
-              if (numb_me>0 || numb_ps_all>0) return false;
+              if (numb_me>0 || numb_ps_all>0) return ReturnFunc(false);
             }
           if(m_modus==6){
-              if (num_light_fs_quarks_me + num_fs_gluons_me >= 2) return true;
-              if ((numb_ps+numb_me)>0) return false;
+              if (num_light_fs_quarks_me + num_fs_gluons_me >= 2) return ReturnFunc(true);
+              if ((numb_ps+numb_me)>0) return ReturnFunc(false);
 
             }
 
@@ -180,18 +155,18 @@ namespace SELAN{
            * May one can check this in the cluster configuration?
            * One could for example directlx check the final cluster configuration and veto all configurations which have a ttbb cluster step?
            */
-              if (numb_me>0) return false;
+              if (numb_me>0) return ReturnFunc(false);
               if (m_nlo){
-                  if (num_light_fs_quarks_me + num_fs_gluons_me > 2) return true;
-                  if (num_light_fs_quarks_me >=2 ) return true;
+                  if (num_light_fs_quarks_me + num_fs_gluons_me > 2) return ReturnFunc(true);
+                  if (num_light_fs_quarks_me >=2 ) return ReturnFunc(true);
                 } else {
-                  if (num_light_fs_quarks_me + num_fs_gluons_me > 1) return true;
-                  if (num_light_fs_quarks_me >=1 ) return true;
+                  if (num_light_fs_quarks_me + num_fs_gluons_me > 1) return ReturnFunc(true);
+                  if (num_light_fs_quarks_me >=1 ) return ReturnFunc(true);
                 }
-              if (numb_ps>0) return false;
+              if (numb_ps>0) return ReturnFunc(false);
             }
 
-          return true;
+          return ReturnFunc(true);
         }
 
       else {
@@ -206,6 +181,7 @@ namespace SELAN{
          */
 
          ATOOLS::String_BlobDataBase_Map  bdmap = bl->FindFirst(ATOOLS::btp::Shower)->GetData();
+
          auto search = bdmap.find("AllAmplitudes");
          if (search==bdmap.end()) {
              THROW(fatal_error,"No matching amplitude found in blob. This algorithm works only with the ttbb224 branch!");
@@ -229,21 +205,62 @@ namespace SELAN{
              else break;
            }
 
-         if (pos==0) return true;
+         if (pos==0) return ReturnFunc(true);
          else return CheckPrev(ampl->Prev());
 
-
-
-
         }
 
-
-
-        }
+      }
     }
 
 
     bool Finish(){}
+
+
+    bool CheckPrev(ATOOLS::Cluster_Amplitude *ampl){
+      //return only true, if a sufficient high number of light partons is present in this amplitude's final state
+      if (ampl==NULL) return ReturnFunc(false);
+      size_t num_q(0);
+      size_t num_g(0);
+      for (int i=2; i<ampl->Legs().size(); i++){
+          ATOOLS::Cluster_Leg *leg = ampl->Legs().at(i);
+          if (leg->Flav().IsGluon() && !leg->FromDec()) num_g++;
+          if (abs(leg->Flav().Kfcode())<5 && !leg->FromDec()) num_q++;
+      }
+
+      if (m_nlo){
+          if (num_q >=2 || (num_q + num_g)>2) return ReturnFunc(true);
+          else return ReturnFunc(false);
+        }
+      else{
+          if ((num_q + num_g)>=1) return ReturnFunc(true);
+          else return ReturnFunc(false);
+        }
+    }
+
+    size_t FindB(ATOOLS::Cluster_Amplitude *ampl){
+      if (ampl==NULL) return 0;
+      for (int i=2; i<ampl->Legs().size(); i++){
+          ATOOLS::Cluster_Leg *leg = ampl->Legs().at(i);
+          if ( abs(leg->Flav().Kfcode())==5 && !leg->FromDec()) return i;
+        }
+      return 0;
+    }
+
+
+
+    bool ReturnFunc(bool retval){
+      if (retval==false){
+          msg_Debugging() << "false\n";
+        }
+
+      if (!m_store) return retval;
+      p_bl->FindFirst(ATOOLS::btp::Signal_Process)->AddData("Veto",new ATOOLS::Blob_Data<int>(!retval));
+      return true;
+
+    }
+
+
 
   };// end of class SELANA
 

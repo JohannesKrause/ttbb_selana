@@ -56,7 +56,7 @@ namespace SELAN{
         infile=infile.substr(0,infile.find('|'));
       reader.SetInputFile(infile+"|BEGIN_SELANA|END_SELANA");
       reader.SetComment("#");
-      m_modus = reader.GetValue<int>("SELMODUS", 1);
+      m_modus = reader.GetValue<int>("SELMODUS", 8);
       m_nlo = reader.GetValue<int>("NLO_Mode", 1);
       m_store = reader.GetValue<int>("STORE_IN_HEPMC", 0);
       msg_Debugging()<<METHOD<<"(): { mode \n" <<

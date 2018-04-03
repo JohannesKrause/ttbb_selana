@@ -25,6 +25,8 @@ namespace SELAN{
     std::string m_inpath;
     std::string m_infile;
     std::string m_outpath;
+    size_t num_is_vetos, num_fs_vetos, num_both_vetos;
+
   public:
 
 
@@ -63,6 +65,10 @@ namespace SELAN{
                        "skip b's from hard decay handler:  modus(" << m_modus <<
                        "), NLO(" << m_nlo << ") \n }" << std::endl;
 
+      num_both_vetos=0;
+      num_fs_vetos=0;
+      num_is_vetos=0;
+
       return true;
     }
 
@@ -74,17 +80,29 @@ namespace SELAN{
 
       if (m_modus!=8){
           //removed
+          THROW(fatal_error,"Only modus 8 is implemented!");
         }
 
 
       else {
           /*   modus 8 -- use cluster history
+           * final state configs:
                 1) find first amplitude with b which does not come from a hard decay
-                     -> no such amplitude: return true
+                     -> no such amplitude: keep
                 2) check, if previous amplitude has two light quarks or three lights partons in the FS
-                    (check nlode mode for the exact number)
-                     -> if yes: return true
-                3) return false
+                    (check nlo mode for the exact number)
+                     -> if yes: keep
+                     -> otherwise:  do veto, contribution included in Xbb
+
+            * initial state configs:
+                1) check if previous amplitude has sufficient light final state partons -> keep
+                2) count number of intermediate emissions, before initial-state b-splittings are unfolded
+                  -> sufficient emissions? -> keep
+                  -> if not: this is already part of the Xbb simulation and has to be removed
+
+          do Veto, except both methods say "noVeto"
+
+          It looks like the inital Veto is already included in the final Veto, all problematic configurations of IS-2) are found by the Final Veto, too.
 
          */
 
@@ -102,6 +120,9 @@ namespace SELAN{
          ATOOLS::Cluster_Amplitude * ampl = orig_ampl;
 
 
+         bool veto_final   = true;
+         bool veto_initial = true;
+
          // find first amplitude with b
          size_t pos=0;
          while (true){
@@ -113,8 +134,47 @@ namespace SELAN{
              else break;
            }
 
-         if (pos==0) return ReturnFunc(true);
-         else return CheckPrev(ampl->Prev());
+         if (pos==0) veto_final=false;
+         else veto_final = !CheckFinal(ampl->Prev());  // keep amplitude -> do not a veto
+
+         //now do initial state treatment
+
+         /* strategy for IS: look for first amplitude with b in IS
+          *   no such amplitude:  allowed config
+          * count number of IS-b's ?
+          *   amplitude found:  check next and next->next if there was an IS splitting leading to final state b's
+          *            -> check number of intermediate emissions. maximal one allowed (RS-emission)
+          *         bb|x -> bb|xg -> bg| xgb  -> gg| xgbb     :  not allowed in tt+jets
+          *         bb|x -> bb|xg -> bg| xgb  -> bg| xggb     :  allowed in tt+jets, two emissions harder than second b-splitting
+
+         */
+
+
+         // find first amplitude with b in IS and count number of b's there
+         ampl = orig_ampl; // reset pointer
+         size_t num_is_b=0;
+         while (true){
+             if (ampl==NULL) break;
+             num_is_b = CountBinIS(ampl);
+             if (num_is_b==0) {
+                 ampl = ampl->Next();
+               }
+             else break;
+           }
+        //"ampl" points to amplitude with num_is_b b-quarks in IS
+         if (num_is_b==0) veto_initial=false;
+         else veto_initial = !CheckInitial(ampl);
+
+
+         // fill statistics
+         if (veto_final && veto_initial) num_both_vetos++;
+         else{
+             if (veto_final) num_fs_vetos++;
+             if (veto_initial) num_is_vetos++;
+           }
+
+         //do Veto, except both methods say "noVeto"
+         return ReturnFunc(!(veto_final || veto_initial));
 
         }
 
@@ -122,12 +182,22 @@ namespace SELAN{
     }
 
 
-    bool Finish(){}
+    bool Finish(){
 
+      //todo:  print some statistics: number of initial-vetos, number of final-vetos, combined vetoes?
+      msg_Info() << "Some statistics about the veto procedure:" <<std::endl;
+      msg_Info() << "   number of events with IS and FS veto: " << num_both_vetos << ".\n";
+      msg_Info() << "   number of events with FS veto: " << num_fs_vetos << ".\n";
+      msg_Info() << "   number of events with IS veto: " << num_is_vetos << ".\n";
+    }
 
-    bool CheckPrev(ATOOLS::Cluster_Amplitude *ampl){
+///////////////////////   helper functions final state configs   ///////////////////////////////////7
+
+    bool CheckFinal(ATOOLS::Cluster_Amplitude *ampl){
       //return only true, if a sufficient high number of light partons is present in this amplitude's final state
-      if (ampl==NULL) return ReturnFunc(false);
+      //  true:   keep amplitude
+      //  false:  do veto
+      if (ampl==NULL) return false; // could this be an allowed initial state configuration?
       size_t num_q(0);
       size_t num_g(0);
       for (int i=2; i<ampl->Legs().size(); i++){
@@ -137,12 +207,12 @@ namespace SELAN{
       }
 
       if (m_nlo){
-          if (num_q >=2 || (num_q + num_g)>2) return ReturnFunc(true);
-          else return ReturnFunc(false);
+          if (num_q >=2 || (num_q + num_g)>2) return true; // rethink
+          else return false;
         }
       else{
-          if ((num_q + num_g)>=1) return ReturnFunc(true);
-          else return ReturnFunc(false);
+          if ((num_q >=1) || (num_g>1)) return true; // rethink
+          else return false;
         }
     }
 
@@ -155,6 +225,72 @@ namespace SELAN{
       return 0;
     }
 
+    ///////////////////////   helper functions inital state configs   ///////////////////////////////////7
+
+
+    size_t CountBinIS(ATOOLS::Cluster_Amplitude *ampl){
+      if (ampl==NULL) return 0;
+      size_t numb(0);
+      for (int i=0; i<2; i++){
+          ATOOLS::Cluster_Leg *leg = ampl->Legs().at(i);
+          if ( abs(leg->Flav().Kfcode())==5 && !leg->FromDec()) numb++;
+        }
+      return numb;
+    }
+
+    size_t CountEW(ATOOLS::Cluster_Amplitude *ampl){
+      if (ampl==NULL) return 0;
+      size_t num(0);
+      for (int i=2; i<ampl->Legs().size(); i++){
+          ATOOLS::Cluster_Leg *leg = ampl->Legs().at(i);
+          if ( !(leg->Flav().IsQuark() || leg->Flav().IsGluon()) ) num++; // todo: check, if this works.
+        }
+      return num;
+
+    }
+
+    bool CheckInitial(ATOOLS::Cluster_Amplitude *ampl){
+      //return only true, if enough emissions take place before initial splitting is "unfolded"
+      //  true:   keep amplitude
+      //  false:  do veto
+      if (ampl->Next()==NULL) return true;
+
+      //      first: treatment of configs, where the initial b-splitting happens later in the evloution,
+      //      after an already high enough number of emissions
+      //    -> case, where the amplitude before the initial state splitting fullfills the number-of-light-jet condition
+
+      if (ampl->Prev()) {
+          if (CheckFinal(ampl->Prev())) return true;
+        }
+
+      //now: count number on intermediate emissions
+      size_t num_intermed_emissions(0); // maximal 1 for nlo / 0 for LO
+      size_t b_in_amp_prev=CountBinIS(ampl);
+      size_t num_ew_particles_prev = CountEW(ampl);
+
+      while (ampl->Next()){
+          ampl= ampl->Next();
+          size_t b_in_amp_new =CountBinIS(ampl);
+          size_t num_ew_particles_new = CountEW(ampl);
+          bool decay = (num_ew_particles_prev != num_ew_particles_new); // check, if this an actual emission or just a decay
+          // identify decays, if number of non-QCD particles changes to the next amplitude
+          if ((b_in_amp_new >= b_in_amp_prev) && !decay) num_intermed_emissions++;  // emission has not been unfolded in this step
+
+          //check for num_intermed_emissions and decide if veto or not
+          if (num_intermed_emissions > 1 && m_nlo) return true;
+          if (num_intermed_emissions > 0 && !m_nlo) return true;
+
+          // stop, if emission is unfolded
+          if (b_in_amp_new==0) break;
+
+          //reset counters
+          b_in_amp_prev = b_in_amp_new;
+          num_ew_particles_prev = num_ew_particles_new;
+
+        }
+      return false;
+
+      }
 
 
     bool ReturnFunc(bool retval){

@@ -1,6 +1,7 @@
 #include "SHERPA/Tools/Analysis_Interface.H"
 #include "ATOOLS/Org/Message.H"
 #include "ATOOLS/Org/Data_Reader.H"
+#include "ATOOLS/Math/Vector.H"
 #include "SHERPA/Single_Events/Event_Handler.H"
 #include "ATOOLS/Phys/Cluster_Amplitude.H"
 #include <algorithm>
@@ -103,7 +104,7 @@ namespace SELAN{
           do Veto, except both methods say "noVeto"
 
           It looks like the inital Veto is already included in the final Veto, all problematic configurations of IS-2) are found by the Final Veto, too.
-
+          However, it is still usefull for the PDF-corrections
          */
 
          ATOOLS::String_BlobDataBase_Map  bdmap = bl->FindFirst(ATOOLS::btp::Shower)->GetData();
@@ -173,11 +174,74 @@ namespace SELAN{
              if (veto_initial) num_is_vetos++;
            }
 
+
+         /* ***** insert the counterterms for the PDF *******
+          * This is only done, if veto_initial is true and if the b is in the initial state of an amplitude beeing maximally 2->3.
+          * To all other amplitudes (2->4 or 2->5) the A2 terms would not contribute to the required order.
+          *
+          *  strategy:
+          *    1) pick amplitude from above
+          *
+          *   starting with this amplitude, loop over all following:
+          *
+          *    2) check if amplitude has more than 3 FS-particles -> skip!
+          *    3) for each new b in the initial state, calculate the correction weight.
+          *
+          * e.g.: a)  bb|tt -> bb|ttg: calculate correction for both b's for the first amplitude and
+          *                            for one ratio, if there has been an initial state splitting?
+
+          *       b)  gg|tt -> gb|ttb -> bb |ttbb:  calculate only correction for b-quark in second amplitude
+          *       c)   gb|ttb -> xx|xxxx      : calculate only correction for first b-quark
+          *
+          * ******** questions:
+          *
+          *     * whats about addional IS-splittings on top off bb|tt?
+          *       There the b-pdf enters the PDF-ratio in the Sudakovs, is this already higher order?
+          *       -> Can one there just compute in the first amplitude the untouched b-pdf and in the secondstep the other one?
+          *
+          *  TODO:
+          *      need Q2 in Amplitude. Which use? kT?
+          *       was ist die richtige Skala? kTstart ist evtl höher als muf, falls es später einen Zerfall mit größerem kT gibt...
+          *         -> nehme muF, falls 2->2 config, sonst kT_start für die Korrektur
+          *
+          *
+          *   neue Strategie mache Korrektur für alle IS-b's bis zur 2->3 Konfig?
+          */
+
+
+         // start with the implementation
+
+         // 2) if amplitude is to large, the corrections are higher order and not neccesary
+         double weightfac(0.);
+         int bookkeep[2] = {0,0};  // stores p_z of all b's which have already be corrected. the sign avoids double counting
+
+
+         if(veto_initial){
+             while(ampl->Legs().size()<=5){
+
+                 for (int index=0; index < 2; index++){
+                     if(abs(ampl->Leg(index)->Flav().Kfcode())==5) {
+                         double test =  ampl->Leg(index)->Mom().operator [](3);
+                         // if the ratio for one of the bookkeep's is >0, this has to be skipped
+                         if ( !((bookkeep[0]/test >0) || (bookkeep[1]/test >0))  ) {
+                             weightfac+=PdfCorrection(ampl,index);
+                             bookkeep[index] =test;
+                           }
+                       }
+                   }
+                 ampl=ampl->Next();
+
+
+               }
+           }
+
+
+
+
          //do Veto, except both methods say "noVeto"
          return ReturnFunc(!(veto_final || veto_initial));
 
         }
-
       }
     }
 
@@ -296,6 +360,7 @@ namespace SELAN{
     bool ReturnFunc(bool retval){
       if (retval==false){
           msg_Debugging() << "false\n";
+          abort();
         }
 
       if (!m_store) return retval;
@@ -303,6 +368,15 @@ namespace SELAN{
       return true;
 
     }
+
+
+    //  *****************************  PDF-Weight Correction ************************
+    double PdfCorrection(ATOOLS::Cluster_Amplitude * ampl,int index){
+
+      return 0.;
+    }
+
+
 
 
 
